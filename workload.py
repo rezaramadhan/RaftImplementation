@@ -21,6 +21,8 @@ def sendWorkload():
         r = requests.post(url, data={'cpu_workload' : cpu_workload})
         print(r.status_code, r.reason)
 
+        
+
 getLoadBalancerList('loadbalancer.txt')
 sendWorkload()
 #for i in range(0, 100):
