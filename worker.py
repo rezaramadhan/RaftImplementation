@@ -1,10 +1,7 @@
-#!/usr/bin/env python
-from http.server import HTTPServer
-from http.server import BaseHTTPRequestHandler
+#!/usr/bin/python
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 
-PORT = 13337
-
-class WorkerHandler(BaseHTTPRequestHandler):
+class MyHandler(BaseHTTPRequestHandler):
     def prime(self, n):
         i = 2
         while i * i <= n:
@@ -35,5 +32,9 @@ class WorkerHandler(BaseHTTPRequestHandler):
             self.end_headers()
             print(ex)
 
-server = HTTPServer(("", PORT), WorkerHandler)
-server.serve_forever()
+HOST_NAME = '' # !!!REMEMBER TO CHANGE THIS!!!
+PORT_NUMBER = 13337 # Maybe set this to 9000.
+
+if __name__ == '__main__':
+    server = HTTPServer((HOST_NAME, PORT_NUMBER), MyHandler)
+    server.serve_forever();
