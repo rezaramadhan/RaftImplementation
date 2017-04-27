@@ -2,6 +2,7 @@
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import requests
 import sys
+import config
 
 loadBalancerList = []
 
@@ -24,59 +25,61 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             args = self.path.split('/')
-            if len(args) < 5:
-                raise Exception()
+            #if len(args) < 5:
+            #    raise Exception()
             sender = args[1]
             server_host = args[2]
             server_port = args[3]
-            server_workload = float(args[4])
-            print(server_host+server_port)
-            self.server_list[str(server_host+server_port)] = server_workload
-
-            self.send_response(200)
-            self.end_headers()
-
-            for key in self.server_list:
-                print(self.wfile.write(self.server_list[key]))
-                #self.wfile.write(server_list[key].encode('utf-8'))
+            message = {}
+            # server_workload = float(args[4])
+            # print(server_host+server_port)
 
             if sender == 'CLIENT':
-                self.process_client_request(server_workload)
+                message['workload'] = float(args[4])
+                self.server_list[str(server_host+':'+server_port)] = message['workload']
+
+                for key in self.server_list:
+                    print(self.wfile.write(self.server_list[key]))            
+                    self.process_client_request(message)
             elif sender == 'FOLLOWER':
                 pass
             elif sender == 'CANDIDATE':
                 pass
             elif sender == 'LEADER':
                 print('process_leader_request')
-            # Print to check if data is accepted correctly
-            # self.wfile.write(server_port.encode('utf-8'))
-            # self.wfile.write('\n'.encode('utf-8'))
-            # self.wfile.write(str(server_workload).encode('utf-8'))
+                message['msg_type'] = args[4]
+                message['value'] = args[5]
+                self.process_leader_request(message)			
+            self.send_response(200)
+            self.end_headers()
         except Exception as ex:
             self.send_response(500)
             self.end_headers()
-            print(ex)
-
-    def getLoadBalancerList(self, filename):
-        with open(filename) as fp:
-            for line in fp:
-                loadBalancerList.append(line)            
+            print(ex)          
             
-    def process_client_request(self, server_workload):
+    def process_client_request(self, msg):
         """ Handle requests issued by clients. """
         if self.status == 'LEADER':
-            self.raftlog.append(server_workload)
+            self.raftlog.append(msg)
             print(self.raftlog)
-            self.broadcast_request('AppendEntries', server_workload)
+            self.broadcast_request('AppendEntries', msg)
+    
+    def process_leader_request(self, msg):
+        if self.status != 'FOLLOWER':
+            self.status = 'FOLLOWER'
 
-    def broadcast_request(self, msg_type, data=None):
+        if msg['msg_type'] == 'AppendEntries':
+            self.raftlog.append(msg)
+            print(self.raftlog)
+
+    def broadcast_request(self, msg_type, msg):
         """ Broadcrast a msg_type request to all servers """
-        self.getLoadBalancerList('loadbalancer.txt')
-        for url in loadBalancerList:
-            url = url + 'LEADER/' + HOST_NAME + '/' + str(PORT_NUMBER) + '/' + str(data)
-            print(url)
-            r = requests.get(str(url))
-            #print(r.status_code, r.reason)
+        for server in config.LOAD_BALANCER:
+            if not ((server[0] == HOST_NAME) and (server[1] == PORT_NUMBER)):
+                url = 'http://' + str(server[0]) + ':' + str(server[1]) + '/LEADER/' + HOST_NAME + '/' + str(PORT_NUMBER) + '/' + str(msg_type) + '/' + str(msg['workload'])
+                print(url)
+                r = requests.get('http://' + str(server[0]) + ':' + str(server[1]) + '/LEADER/' + HOST_NAME + '/' + str(PORT_NUMBER) + '/' + str(msg_type) + '/' + str(msg['workload']))
+                #print(r.status_code, r.reason)
 
 # Run with host name and port number argument
 # Example : python loadbalancer.py 127.0.0.1 8080
