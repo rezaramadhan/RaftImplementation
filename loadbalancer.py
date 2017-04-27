@@ -10,6 +10,8 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
     def __init__(self, request, client_address, server):
         #Don't change init order. If changed, exception is gonna happen
         self.status = 'LEADER'
+        self.term = 1
+        self.last_committed = -1
         self.server_list = {}
         self.raftlog = []
         BaseHTTPRequestHandler.__init__(self, request, client_address, server)
@@ -35,12 +37,16 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
             # print(server_host+server_port)
 
             if sender == 'CLIENT':
-                message['workload'] = float(args[4])
-                self.server_list[str(server_host+':'+server_port)] = message['workload']
+                # only process if node is leader
+                if self.status == 'LEADER':
+                    message['term'] = self.term
+                    message['server'] = server_host+':'+server_port
+                    message['workload'] = float(args[4])
+                    self.server_list[str(server_host+':'+server_port)] = message['workload']
 
-                for key in self.server_list:
-                    print(self.wfile.write(self.server_list[key]))            
-                    self.process_client_request(message)
+                    for key in self.server_list:
+                        print(self.wfile.write(self.server_list[key]))            
+                        self.process_client_request(message)
             elif sender == 'FOLLOWER':
                 pass
             elif sender == 'CANDIDATE':
@@ -48,7 +54,9 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
             elif sender == 'LEADER':
                 print('process_leader_request')
                 message['msg_type'] = args[4]
-                message['value'] = args[5]
+                message['term'] = self.term
+                message['server'] = args[6]                
+                message['workload'] = args[5]
                 self.process_leader_request(message)			
             self.send_response(200)
             self.end_headers()
@@ -72,13 +80,23 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
             self.raftlog.append(msg)
             print(self.raftlog)
 
+    def process_follower_request(self, sender, msg):
+        """ Handle requests issued by followers. """
+        # To do : retrieve voting
+        if msg['msg_type'] == 'AcceptAppendEntries':
+            if self.status == 'LEADER':
+                # See if we can commit yet.  If we can...
+                self.perform_action(message)
+                # Do we mark it as committed?
+                self.broadcast_request('AppendEntriesCommitted')			
+			
     def broadcast_request(self, msg_type, msg):
         """ Broadcrast a msg_type request to all servers """
         for server in config.LOAD_BALANCER:
             if not ((server[0] == HOST_NAME) and (server[1] == PORT_NUMBER)):
-                url = 'http://' + str(server[0]) + ':' + str(server[1]) + '/LEADER/' + HOST_NAME + '/' + str(PORT_NUMBER) + '/' + str(msg_type) + '/' + str(msg['workload'])
+                url = 'http://' + str(server[0]) + ':' + str(server[1]) + '/LEADER/' + HOST_NAME + '/' + str(PORT_NUMBER) + '/' + str(msg_type) + '/' + str(msg['workload']) + '/' + str(msg['server'])
                 print(url)
-                r = requests.get('http://' + str(server[0]) + ':' + str(server[1]) + '/LEADER/' + HOST_NAME + '/' + str(PORT_NUMBER) + '/' + str(msg_type) + '/' + str(msg['workload']))
+                r = requests.get('http://' + str(server[0]) + ':' + str(server[1]) + '/LEADER/' + HOST_NAME + '/' + str(PORT_NUMBER) + '/' + str(msg_type) + '/' + str(msg['workload']) + '/' + str(msg['server']))
                 #print(r.status_code, r.reason)
 
 # Run with host name and port number argument
