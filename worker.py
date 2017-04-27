@@ -1,8 +1,6 @@
-#!/usr/bin/env python
-from httplib2 import *
-from http import *
-
-PORT = 82
+#!/usr/bin/python
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+import sys
 
 class WorkerHandler(BaseHTTPRequestHandler):
     def prime(self, n):
@@ -35,5 +33,11 @@ class WorkerHandler(BaseHTTPRequestHandler):
             self.end_headers()
             print(ex)
 
-server = HTTPServer(("", PORT), WorkerHandler)
-server.serve_forever()
+# Run with host name and port number argument
+# Example : python worker.py 127.0.0.1 8080
+HOST_NAME = sys.argv[1]
+PORT_NUMBER = int(sys.argv[2])
+
+if __name__ == '__main__':
+    server = HTTPServer((HOST_NAME, PORT_NUMBER), WorkerHandler)
+    server.serve_forever();
