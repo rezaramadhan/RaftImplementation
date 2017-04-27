@@ -25,13 +25,14 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
             server_host = args[2]
             server_port = args[3]
             server_workload = float(args[4])
-            self.server_list[server_host+server_port] = server_workload
+            print(server_host+server_port)
+            self.server_list[str(server_host+server_port)] = server_workload
 
             self.send_response(200)
             self.end_headers()
 
-            for key in server_list:
-                print(self.wfile.write(self.server_list[key].encode('utf-8')))
+            for key in self.server_list:
+                print(self.wfile.write(self.server_list[key]))
                 #self.wfile.write(server_list[key].encode('utf-8'))
 
             # Print to check if data is accepted correctly
