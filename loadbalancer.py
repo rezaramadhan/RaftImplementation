@@ -3,7 +3,10 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import sys
 
 class LoadBalancerHandler(BaseHTTPRequestHandler):
-    server_list = {}
+    def __init__(self, request, client_address, server):
+        #Don't change init order. If changed, exception is gonna happen
+        self.server_list = {}
+        BaseHTTPRequestHandler.__init__(self, request, client_address, server)
 
     def do_POST(self):
         try:
@@ -16,18 +19,20 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             args = self.path.split('/')
-            if len(args) != 4:
+            if len(args) < 5:
                 raise Exception()
-            server_host = args[1]
-            server_port = args[2]
-            server_workload = float(args[3])
-            server_list[server_host+server_port] = server_workload
+
+            server_host = args[2]
+            server_port = args[3]
+            server_workload = float(args[4])
+            self.server_list[server_host+server_port] = server_workload
 
             self.send_response(200)
             self.end_headers()
 
             for key in server_list:
-                self.wfile.write(server_list[key].encode('utf-8'))
+                print(self.wfile.write(self.server_list[key].encode('utf-8')))
+                #self.wfile.write(server_list[key].encode('utf-8'))
 
             # Print to check if data is accepted correctly
             # self.wfile.write(server_port.encode('utf-8'))
