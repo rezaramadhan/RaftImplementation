@@ -52,6 +52,7 @@ def broadcastHeartbeat(myhost, myport):
 def listenHeartbeat(myhost, myport):
     """Used by Follower to listen heartbeat from Leader."""
     sockServer = socket.socket()
+    sockServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sockServer.bind((myhost, myport + 1))
     print "I'm a folllower"
     print "  Creating heartbeat listener on " + myhost, myport + 1
