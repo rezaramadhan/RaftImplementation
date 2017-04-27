@@ -69,6 +69,7 @@ def listenHeartbeat(myhost, myport):
             sockServer.settimeout(heartbeatTimeout)  # timeout for listening
             sockServer.listen(1)
             (conn, (ip, port)) = sockServer.accept()
+            conn.setblocking(1)
             text = conn.recv(128)
             print "<-recv " + text + "from" + ip, port
             if (text == "!"):
@@ -85,7 +86,7 @@ def listenHeartbeat(myhost, myport):
         except socket.timeout:
             print "leader is dead"
             state = "CANDIDATE"
-    sockServer.shutdown(socket.SHUT_RDWR)
+#    sockServer.shutdown(socket.SHUT_RDWR)
     print "   now I'm not a follower"
 
 
