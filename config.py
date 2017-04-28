@@ -31,11 +31,14 @@ lastApplied = -1
 nextIndex = []
 matchIndex = []
 
-class logElement():
-    def __init__(term, load, owner):
+class LogElement():
+    def __init__(self, term, load, owner):
         self.term = term
-        self.load = 80
+        self.load = load
         self.owner = owner
+
+    def __repr__(self):
+        return '{ "term" : "' + str(self.term)+ '", "load" : "' + str(self.load) + '", "owner" : "' + str(self.owner) + '" }'
         
     def toString():
         return '{ "term" : "' + str(self.term)+ '", "load" : "' + str(self.load) + '", "owner" : "' + str(self.owner) + '" }'

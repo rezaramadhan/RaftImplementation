@@ -18,12 +18,14 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries, leaderCommit
     if term < currentTerm:
         return (currentTerm, False)
     
-    if prevLogIdx < len(log)
+    if prevLogIdx < len(log):
         entry = log[prevLogIdx]
         logTerm = entry["term"]
         
         if logTerm == prevLogTerm:
-            log.append(entries)
+            print log
+            log = log[:(prevLogIndex+1)] + entries
+            print log
             
             if commitIndex < leaderCommitIdx:
                 commitIndex = leaderCommitIdx
@@ -147,18 +149,25 @@ def askVote(myhost, myport):
     print "   now I'm not a candidate"
 
 
-def workerListener():
+def workerListener(myhost, myport):
     sockServer = socket.socket()
     sockServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sockServer.bind((myhost, myport + 1))
+    sockServer.bind((myhost, myport - 1))
+    print "  Creating worker listener on " + myhost, myport - 1    
     while True:
         try:
-            sockServer.settimeout(WORKER_TIMEOUT)  # timeout for listening
+            #sockServer.settimeout(WORKER_TIMEOUT)  # timeout for listening
             sockServer.listen(1)
             (conn, (ip, port)) = sockServer.accept()
             conn.setblocking(1)
             text = conn.recv(128)
-
+            text = text.split(";")
+            print "<-   recv from daemon " + text[0] + " " + text[1] + " from " + ip, port
+            logElement = LogElement(currentTerm, text[0], (ip,text[1]))
+            print log
+            log.append(logElement)
+            print log
+            conn.close()
         except socket.timeout:
             print "leader is dead"
 
@@ -166,6 +175,9 @@ def workerListener():
 def main(myhost, myport):
     """Main program entry point."""
     print "I'm " + myhost, myport
+    t = Thread(target=workerListener,
+               args=(myhost, myport))
+    t.start()
     while True:
         if (state == "FOLLOWER"):
             listenHeartbeat(myhost, myport)
