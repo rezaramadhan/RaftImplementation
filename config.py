@@ -20,7 +20,7 @@ server_list = {}
 
 """ Persistent state on all servers """"
 currentTerm = 0
-votedFor = null
+votedFor = None
 log = []
 
 """ Volatile state on all servers """

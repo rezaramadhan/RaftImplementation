@@ -9,7 +9,22 @@ from config import *
 from time import sleep
 
 def appendEntries(term, leaderID, prefLogIdx, prefLogTerm, entries, leaderCommitIdx):
-    # term, succes
+    if term < currentTerm:
+        return (currentTerm, False)
+    
+    if prevLogIndex < len(log)
+        entry = log[prevLogIndex]
+        logTerm = entry["term"]
+        
+        if logTerm == prevLogTerm:
+            log.append(entries)
+            
+            if commitIndex < leaderCommit:
+                commitIndex = leaderCommit
+                
+            return (currentTerm, True)
+    
+    return (currentTerm, False)
 
 
 def sendHeartbeat(dest_host, dest_port):
