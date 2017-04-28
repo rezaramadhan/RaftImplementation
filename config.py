@@ -38,13 +38,13 @@ class logElement():
         self.load = 80
         self.owner = owner
 
-    def toString()
+    def toString():
         data = '{ "term" : "' + str(self.term)+
         '", "load" : "' + str(self.load) +
         '", "owner" : "' + str(self.owner) + '" }'
         return data
 
-    def __str__()
+    def __str__():
         data = '{ "term" : "' + str(self.term)+
         '", "load" : "' + str(self.load) +
         '", "owner" : "' + str(self.owner) + '" }'
