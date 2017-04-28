@@ -18,7 +18,7 @@ WORKER_TIMEOUT = 5
 server_list = {}
 
 
-""" Persistent state on all servers """"
+""" Persistent state on all servers """
 currentTerm = 0
 votedFor = None
 log = []
@@ -37,5 +37,5 @@ class logElement():
         self.load = 80
         self.owner = owner
         
-    def toString()
+    def toString():
         return '{ "term" : "' + str(self.term)+ '", "load" : "' + str(self.load) + '", "owner" : "' + str(self.owner) + '" }'
