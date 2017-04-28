@@ -9,9 +9,8 @@
 """IMPLEMENTASI RAFT - DAEMON."""
 import socket
 import psutil
-import requests
 import sys
-from config import *
+from config import WORKER_SEND_S, LOAD_BALANCER
 from time import sleep
 
 cpu_workload = '0.0'
@@ -36,7 +35,6 @@ def sendWorkload(workload):
             print str(dest_host) + " " + str(dest_port)
             sockClient = socket.socket()
             sockClient.connect((dest_host, dest_port))
-            print "->send ! to" + dest_host, dest_port
             sockClient.send(str(workload)+";"+PORT_NUMBER)
             sockClient.close()
         except socket.error, v:
@@ -49,4 +47,4 @@ while True:
     workload = getWorkLoad()
     print(str(workload))
     sendWorkload(workload)
-    sleep(15)
+    sleep(WORKER_SEND_S)

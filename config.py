@@ -6,20 +6,22 @@
 
 """IMPLEMENTASI RAFT - CONFIG."""
 
+from ast import literal_eval
+
 LOAD_BALANCER = [
-    ['127.0.0.1', 5000],
-    ['127.0.0.1', 6000],
-    ['127.0.0.1', 7000],
-    # ['192.168.43.52', 5000],
-    # ['192.168.43.52', 6000],
-    # ['192.168.43.52', 7000]
+    # ['127.0.0.1', 5000],
+    # ['127.0.0.1', 6000],
+    # ['127.0.0.1', 7000],
+    ['192.168.43.52', 5000],
+    ['192.168.43.52', 6000],
+    ['192.168.43.52', 7000]
 ]
 
 # Avaiable state = [FOLLOWER, LEADER, CANDIDATE]
 state = "FOLLOWER"
 HEARTBEAT_SEND_S = 3
 HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S * 2
-WORKER_TIMEOUT = 10
+WORKER_SEND_S = 10
 server_list = {}
 
 
@@ -43,13 +45,16 @@ class LogElement():
     def __init__(self, term=0, load=0.0, owner=(1, 1)):
         """constructor."""
         self.term = term
-        self.load = load
-        self.owner = owner
+        self.load = float(load)
+        if (isinstance(owner, basestring)):
+            self.owner = literal_eval(owner)
+        else:
+            self.owner = owner
 
     def setDict(self, dict):
         self.term = dict["term"]
-        self.load = dict["load"]
-        self.owner = dict["owner"]
+        self.load = float(dict["load"])
+        self.owner = literal_eval(dict["owner"])
 
     def toString(self):
         """Tostring method."""

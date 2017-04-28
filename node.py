@@ -12,16 +12,18 @@ import json
 import socket
 import sys
 import random
-import json
 import os.path
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import requests
+
+from ast import literal_eval
 from threading import Thread
+from time import sleep
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from config import (LOAD_BALANCER, state, HEARTBEAT_SEND_S, server_list,
-                    HEARTBEAT_TIMEOUT_BASE_S, WORKER_TIMEOUT,
+                    HEARTBEAT_TIMEOUT_BASE_S,
                     currentTerm, votedFor, log, commitIndex, lastApplied,
                     nextIndex, matchIndex, LogElement)
-from time import sleep
+
 
 myID = 0
 agreedLogNumber = 1
@@ -42,14 +44,46 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
+            print "path" + self.path
             args = self.path.split('/')
             if len(args) != 2:
                 raise Exception()
+
+            # print "n" + args[1]
+            if (args[1] == "favicon.ico"):
+                return
+                
             n = int(args[1])
 
-            suitableWorker = getLowestDaemon()
-            r = requests.get("http://"+str(suitableWorker[0])+":"+str(suitableWorker[1])+"/"+str(n))
-            data = r.text
+            server_dead = True
+            while server_dead:
+                if (len(server_list) == 0):
+                    data = "all server died"
+                    server_dead = False
+                    break
+
+                lowestWorker = getLowestDaemon()
+                print server_list
+                if (isinstance(lowestWorker, basestring)):
+                    print "string"
+                    suitableWorker = literal_eval(lowestWorker)
+                else:
+                    suitableWorker = lowestWorker
+
+                # print suitableWorker
+                # print type(suitableWorker)
+                baseurl = str(suitableWorker[0])+":"+str(suitableWorker[1])
+                # baseurl = str(suitableWorker[0])+":"+str(suitableWorker[1]) + str(3)
+                url = "http://" + baseurl + "/" + str(n)
+                print url
+                try:
+                    r = requests.get(url)
+                    server_dead = False
+                    data = r.text
+                except:
+                    print "url dead"
+                    server_list.pop(lowestWorker, None)
+
             self.send_response(200)
             self.end_headers()
 
@@ -98,14 +132,14 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
         elmt = LogElement()
         elmt.setDict(entry)
         new_entry.append(elmt)
-        server_list[elmt.owner] = elmt.load
+        server_list[elmt.owner] = float(elmt.load)
 
     log = log[:(prevLogIdx+1)] + new_entry
     saveLog("log"+myhost+str(myport)+".txt")
 
-    print
-    print "__log__" + str(log)
-    print
+    # print
+    # print "__log__" + str(log)
+    # print
 
     if commitIndex < leaderCommitIdx:
         commitIndex = leaderCommitIdx
@@ -118,8 +152,8 @@ def processHearbeat(data, myhost, myport):
     # print "  processing data " + data
     body = json.loads(data)
 
-    print "___added___" + str(body)
-    print "___entries___" + str(body['entries'])
+    # print "___added___" + str(body)
+    # print "___entries___" + str(body['entries'])
     print
 
     # Call appendEntries to handle payload
@@ -136,7 +170,7 @@ def createEntries(firstIdx, lastIdx):
     """Used by leader to convert log entries to json equivalent.
        The converted value will be sent through socket
     """
-    print firstIdx, lastIdx
+    # print firstIdx, lastIdx
 
     if (firstIdx >= lastIdx or firstIdx < 0):
         return "[]"
@@ -182,10 +216,10 @@ def sendHeartbeat(dest_host, dest_port, clientID):
 
         # Check result, add agreed commit and manage nextIndex
         if(body['success'] == 'True'):
-            nextIndex[clientID] += 1
+            nextIndex[clientID] = len(log)
             agreedLogNumber += 1
-        elif (body['success'] == "False"):
-            nextIndex[clientID] -= 1
+        # elif (body['success'] == "False"):
+            # nextIndex[clientID] -= 1
         print "__nextIDX__" + str(nextIndex)
 
         sockClient.close()
@@ -287,7 +321,7 @@ def askVote(myhost, myport):
     for follower in LOAD_BALANCER:
         print follower
         if (follower[0] != myhost and follower[1] != myport):
-            try
+            try:
                 sockClient = socket.socket()
                 sockClient.connect((follower[0], follower[1] + 1))
                 print "->requesting vote to" + follower[0], follower[1] + 1
@@ -303,6 +337,7 @@ def askVote(myhost, myport):
                 errorcode = v[0]
                 if errorcode == socket.errno.ECONNREFUSED:
                     print "!!Connection Refused"
+
         else:
             print "It's me"
     global state
@@ -340,7 +375,7 @@ def workerListener(myhost, myport):
                 logElement = LogElement(currentTerm, text[0], (ip, text[1]))
                 log.append(logElement)
                 saveLog("log" + myhost+str(myport)+".txt")
-                server_list[(ip, text[1])] = text[0]
+                server_list[(ip, text[1])] = float(text[0])
             # print log
             conn.close()
 
@@ -366,7 +401,6 @@ def initializeNextIndex():
 def getLowestDaemon():
     lowestDaemon = None
     lowestValue = 9999
-
     for key in server_list:
         if (lowestDaemon is None):
             lowestDaemon = key
@@ -394,11 +428,13 @@ def loadLog(filename):
             logTemp = json.loads(text[2])
 
             for data in logTemp:
-                logElement = LogElement(data['term'], data['load'], data['owner'])
+                owner = literal_eval(data['owner'])
+                # print type(owner)
+                logElement = LogElement(data['term'], data['load'], owner)
                 log.append(logElement)
 
             for data in log:
-                server_list[str(data.owner)] = str(data.load)
+                server_list[data.owner] = float(str(data.load))
 
             # print server_list
 
@@ -443,9 +479,7 @@ if __name__ == '__main__':
     else:
         myID = int(sys.argv[1])
         server = HTTPServer(('', LOAD_BALANCER[myID][1]), LoadBalancerHandler)
-        print "@@@@@@@@@@@@@@@@@hello"
 
         t = Thread(target=server.serve_forever, args=())
         t.start()
-        print "$$$$$$$$$$$$"
         main('', LOAD_BALANCER[myID][1])

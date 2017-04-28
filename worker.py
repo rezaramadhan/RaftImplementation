@@ -35,8 +35,12 @@ class WorkerHandler(BaseHTTPRequestHandler):
 
 # Run with host name and port number argument
 # Example : python worker.py 8080
-PORT_NUMBER = int(sys.argv[1])
+
 
 if __name__ == '__main__':
+    if (len(sys.argv) != 2):
+        print "error"
+        sys.exit()
+    PORT_NUMBER = int(sys.argv[1])
     server = HTTPServer(("", PORT_NUMBER), WorkerHandler)
-    server.serve_forever();
+    server.serve_forever()
