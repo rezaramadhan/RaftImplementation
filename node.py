@@ -9,16 +9,24 @@ from threading import Thread
 from config import (LOAD_BALANCER, state, HEARTBEAT_SEND_S,
                     HEARTBEAT_TIMEOUT_BASE_S, WORKER_TIMEOUT,
                     currentTerm, votedFor, log, commitIndex, lastApplied,
-                    nextIndex, matchIndex, logElement)
+                    nextIndex, matchIndex, LogElement)
 from time import sleep
 
 myID = 0
-
+agreedLogNumber = 1
 
 def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
                   leaderCommitIdx):
     """Append entries RPC."""
-    global currentTerm, votedFor
+    global currentTerm, votedFor, commitIndex, log
+
+
+    if (term > currentTerm):
+        currentTerm = term
+        votedFor = -1
+
+    if len(entries) == 0:
+        return (currentTerm, None)
 
     term = int(term)
     leaderID = int(leaderID)
@@ -28,34 +36,40 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
     leaderCommitIdx = int(leaderCommitIdx)
 
     if term < currentTerm:
+        print "!!!!!false wrongterm"
         return (currentTerm, False)
 
-    if (term > currentTerm):
-        currentTerm = term
-        votedFor = -1
+    # entry = log[prevLogIdx]
+    # logTerm = entry.term
 
-    if len(entries) == 0:
-        return (currentTerm, True)
+    # if logTerm == prevLogTerm:
+    new_entry = []
+    for entry in entries:
+        elmt = LogElement()
+        elmt.setDict(entry)
+        new_entry.append(elmt)
 
-    if prevLogIdx == -1 or prevLogIdx < len(log):
-        entry = log[prevLogIdx]
-        logTerm = entry["term"]
+    log = log[:(prevLogIdx+1)] + new_entry
+    print
+    print "__log__" + str(log)
+    print
 
-        if logTerm == prevLogTerm:
-            log.append(entries)
-            global commitIndex
-            if commitIndex < leaderCommitIdx:
-                commitIndex = leaderCommitIdx
+    if commitIndex < leaderCommitIdx:
+        commitIndex = leaderCommitIdx
 
-            return (currentTerm, True)
+    return (currentTerm, True)
 
-    return (currentTerm, False)
 
 
 def processHearbeat(data):
     """Used by follower to prcess a heartbeat payload."""
-    print "  processing data " + data
+    # print "  processing data " + data
     body = json.loads(data)
+
+    print "___added___" + str(body)
+    print "___entries___" + str(body['entries'])
+    print
+
     (term, result) = appendEntries(body['term'], body['leaderID'],
                                    body['prefLogIdx'], body['prefLogTerm'],
                                    body['entries'], body['leaderCommitIdx'])
@@ -65,11 +79,12 @@ def processHearbeat(data):
 
 def createEntries(firstIdx, lastIdx):
     """Used by leader to convert log entries to json equivalent."""
-    if (firstIdx <= lastIdx):
+    print firstIdx, lastIdx
+
+    if (firstIdx >= lastIdx or firstIdx < 0):
         return "[]"
 
-    print firstIdx, lastIdx
-    data = "[" + log[firstIdx]
+    data = "[" + str(log[firstIdx])
     for i in range(firstIdx + 1, lastIdx):
         data = data + ", " + str(log[i])
     data = data + "]"
@@ -79,13 +94,14 @@ def createEntries(firstIdx, lastIdx):
 def sendHeartbeat(dest_host, dest_port, clientID):
     """Sending heartbeat to a single follower using a certain socket Client."""
     try:
-        global currentTerm, log, commitIndex, nextIndex
+        global currentTerm, log, commitIndex, nextIndex, agreedLogNumber
         sockClient = socket.socket()
         sockClient.connect((dest_host, dest_port))
         print "->send ! to" + dest_host, dest_port
         prefLogIdx = nextIndex[clientID] - 1
-        entries = createEntries(prefLogIdx + 1, len(log))
-        if (len(log) != 0):
+        entries = createEntries(nextIndex[clientID], len(log))
+        # print entries
+        if (len(log) != 0 and prefLogIdx != -1):
             term = log[prefLogIdx].term
         else:
             term = -1
@@ -99,16 +115,18 @@ def sendHeartbeat(dest_host, dest_port, clientID):
                     '"leaderCommitIdx" : ' + str(commitIndex) +
                     '}')
 
-        print payloads
+        # print payloads
         sockClient.send(payloads)
         recvData = sockClient.recv(1024)
         print recvData
         body = json.loads(recvData)
 
-        if(body['success'] == '"True"'):
+        if(body['success'] == 'True'):
             nextIndex[clientID] += 1
+            agreedLogNumber += 1
         elif (body['success'] == "False"):
             nextIndex[clientID] -= 1
+        print "__nextIDX__" + str(nextIndex)
 
         sockClient.close()
     except socket.error, v:
@@ -118,6 +136,7 @@ def sendHeartbeat(dest_host, dest_port, clientID):
 
 
 def broadcastHeartbeat(myhost, myport):
+    global agreedLogNumber, commitIndex
     """Used by leader to broadcast heartbeat every HEARTBEAT_SEND_S."""
     while (state == "LEADER"):
         print "I'm a leader"
@@ -133,6 +152,14 @@ def broadcastHeartbeat(myhost, myport):
         # Wait for each thread to finish sending
         for job in jobs:
             job.join()
+        print "+++++++++agreed " + str(agreedLogNumber)
+        if (agreedLogNumber >= len(LOAD_BALANCER) / 2 + 1):
+            print "==============commit index"
+            commitIndex += 1
+        else:
+            print "============notcommit"
+
+        agreedLogNumber = 1
         sleep(HEARTBEAT_SEND_S)
     print "   now I'm not a leader"
 
@@ -152,13 +179,13 @@ def listenHeartbeat(myhost, myport):
             # random timeout between X and 2X
             heartbeatTimeout = random.uniform(HEARTBEAT_TIMEOUT_BASE_S,
                                               HEARTBEAT_TIMEOUT_BASE_S * 2)
-            print "--current timeout " + str(heartbeatTimeout)
+            # print "--current timeout " + str(heartbeatTimeout)
             sockServer.settimeout(heartbeatTimeout)  # timeout for listening
             sockServer.listen(1)
             (conn, (ip, port)) = sockServer.accept()
             conn.setblocking(1)
-            text = conn.recv(128)
-            print "<-recv " + text + "from" + ip, port
+            text = conn.recv(2048)
+            # print "<-recv " + text + "from" + ip, port
             # global currentTerm
             if (text[0:4] == "beat"):
                 result = processHearbeat(text[4:])
@@ -221,17 +248,32 @@ def workerListener(myhost, myport):
     """Listener for a worker cpu loads."""
     sockServer = socket.socket()
     sockServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sockServer.bind((myhost, myport + 1))
+    sockServer.bind((myhost, myport - 1))
+    print "  Creating worker listener on " + myhost, myport - 1
     while True:
         try:
-            sockServer.settimeout(WORKER_TIMEOUT)  # timeout for listening
+            # sockServer.settimeout(WORKER_TIMEOUT)  # timeout for listening
             sockServer.listen(1)
             (conn, (ip, port)) = sockServer.accept()
             conn.setblocking(1)
             text = conn.recv(128)
-
+            text = text.split(";")
+            print "<-    recv from daemon " + text[0] + " " + text[1] + " from " + ip, port
+            if (currentTerm > 0):
+                logElement = LogElement(currentTerm, text[0], (ip, text[1]))
+                log.append(logElement)
+            # print log
+            # printlog()
+            conn.close()
         except socket.timeout:
             print "leader is dead"
+
+
+def printlog():
+    data = ""
+    for elmt in log:
+        data = data + str(elmt) + ", "
+    print "log = " + data
 
 
 def initializeNextIndex():
@@ -245,6 +287,9 @@ def initializeNextIndex():
 def main(myhost, myport):
     """Main program entry point."""
     print "I'm " + myhost, myport
+    t = Thread(target=workerListener,
+               args=(myhost, myport))
+    t.start()
     while True:
         if (state == "FOLLOWER"):
             listenHeartbeat(myhost, myport)

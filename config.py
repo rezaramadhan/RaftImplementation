@@ -11,9 +11,9 @@ LOAD_BALANCER = [
 state = "FOLLOWER"
 # HEARTBEAT_SEND_S = 0.05
 # HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S
-HEARTBEAT_SEND_S = 2
+HEARTBEAT_SEND_S = 3
 HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S * 2
-WORKER_TIMEOUT = 5
+WORKER_TIMEOUT = 10
 server_list = {}
 
 
@@ -31,14 +31,19 @@ nextIndex = []
 matchIndex = []
 
 
-class logElement:
+class LogElement():
     """Log element Class."""
 
-    def __init__(self, term, load, owner):
+    def __init__(self, term=0, load=0.0, owner=(1, 1)):
         """constructor."""
         self.term = term
-        self.load = 80
+        self.load = load
         self.owner = owner
+
+    def setDict(self, dict):
+        self.term = dict["term"]
+        self.load = dict["load"]
+        self.owner = dict["owner"]
 
     def toString(self):
         """Tostring method."""
@@ -47,7 +52,7 @@ class logElement:
                 '", "owner" : "' + str(self.owner) + '" }')
         return data
 
-    def __str__(self):
+    def __repr__(self):
         """Tostring method."""
         data = ('{ "term" : "' + str(self.term) +
                 '", "load" : "' + str(self.load) +
