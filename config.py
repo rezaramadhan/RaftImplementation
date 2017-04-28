@@ -36,3 +36,6 @@ class logElement():
         self.term = term
         self.load = 80
         self.owner = owner
+        
+    def toString()
+        return '{ "term" : "' + str(self.term)+ '", "load" : "' + str(self.load) + '", "owner" : "' + str(self.owner) + '" }'
