@@ -10,10 +10,17 @@ from time import sleep
 
 # Avaiable state = [FOLLOWER, LEADER, CANDIDATE]
 state = "FOLLOWER"
+term = 1
 # HEARTBEAT_SEND_S = 0.05
 # HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S
 HEARTBEAT_SEND_S = 2
 HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S * 2
+WORKER_TIMEOUT = 5
+server_list = {}
+
+
+def appendEntries(term, leaderID, prefLogIdx, prefLogTerm, entries, leaderCommitIdx):
+    # term, succes
 
 
 def sendHeartbeat(dest_host, dest_port):
@@ -22,7 +29,7 @@ def sendHeartbeat(dest_host, dest_port):
         sockClient = socket.socket()
         sockClient.connect((dest_host, dest_port))
         print "->send ! to" + dest_host, dest_port
-        sockClient.send("!")
+        sockClient.send("!" + str(term))
         sockClient.close()
     except socket.error, v:
         errorcode = v[0]
@@ -72,8 +79,12 @@ def listenHeartbeat(myhost, myport):
             conn.setblocking(1)
             text = conn.recv(128)
             print "<-recv " + text + "from" + ip, port
-            if (text == "!"):
+            global term
+            if (text[0] == "!"):
                 print "!-leader is alive"
+                if (term != int(text.split('!')[1])):
+                    term = int(text.split('!')[1])
+                    isAlreadyVote = False
             elif (text == "request_vote"):
                 if (isAlreadyVote):
                     print "->send no to" + ip, port
@@ -119,9 +130,27 @@ def askVote(myhost, myport):
     print "  recvd vote " + str(agreedVote)
     if agreedVote >= majorityVote:
         state = "LEADER"
+        global term
+        term += 1
     else:
         state = "FOLLOWER"
     print "   now I'm not a candidate"
+
+
+def workerListener():
+    sockServer = socket.socket()
+    sockServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sockServer.bind((myhost, myport + 1))
+    while True:
+        try:
+            sockServer.settimeout(WORKER_TIMEOUT)  # timeout for listening
+            sockServer.listen(1)
+            (conn, (ip, port)) = sockServer.accept()
+            conn.setblocking(1)
+            text = conn.recv(128)
+
+        except socket.timeout:
+            print "leader is dead"
 
 
 def main(myhost, myport):
