@@ -12,7 +12,22 @@ from time import sleep
 myID = 0
 
 def appendEntries(term, leaderID, prefLogIdx, prefLogTerm, entries, leaderCommitIdx):
-    # term, succes
+    if term < currentTerm:
+        return (currentTerm, False)
+    
+    if prevLogIndex < len(log)
+        entry = log[prevLogIndex]
+        logTerm = entry["term"]
+        
+        if logTerm == prevLogTerm:
+            log.append(entries)
+            
+            if commitIndex < leaderCommit:
+                commitIndex = leaderCommit
+                
+            return (currentTerm, True)
+    
+    return (currentTerm, False)
 
 
 
