@@ -1,5 +1,12 @@
 #!/usr/bin/python
-"""high level support for doing this and that."""
+
+# Nama file : node.py
+# Anggota :
+#   1. Geraldi Dzakwan (13514065)
+#   2. Ade Yusuf Rahardian (13514079)
+#   3. Muhammad Reza Ramadhan (13514107)
+
+"""IMPLEMENTASI RAFT - NODE."""
 
 import json
 import socket
@@ -47,7 +54,7 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
             self.wfile.write(data.encode('utf-8'))
-
+#
         except Exception as ex:
             self.send_response(500)
             self.end_headers()
@@ -63,6 +70,8 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
         currentTerm = term
         votedFor = -1
 
+
+    # Check if there's no entry in payload
     if len(entries) == 0:
         return (currentTerm, None)
 
@@ -81,6 +90,8 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
     # logTerm = entry.term
 
     # if logTerm == prevLogTerm:
+
+    # Change payload data to LogElement
     new_entry = []
     global server_list
     for entry in entries:
@@ -111,15 +122,20 @@ def processHearbeat(data, myhost, myport):
     print "___entries___" + str(body['entries'])
     print
 
+    # Call appendEntries to handle payload
     (term, result) = appendEntries(body['term'], body['leaderID'],
                                    body['prefLogIdx'], body['prefLogTerm'],
                                    body['entries'], body['leaderCommitIdx'], myhost, myport)
+
+    # Convert appendEntries return value to payload data
     data = '{"term" : ' + str(term) + ', "success" : "' + str(result) + '"}'
     return data
 
 
 def createEntries(firstIdx, lastIdx):
-    """Used by leader to convert log entries to json equivalent."""
+    """Used by leader to convert log entries to json equivalent.
+       The converted value will be sent through socket
+    """
     print firstIdx, lastIdx
 
     if (firstIdx >= lastIdx or firstIdx < 0):
@@ -136,6 +152,7 @@ def sendHeartbeat(dest_host, dest_port, clientID):
     """Sending heartbeat to a single follower using a certain socket Client."""
     try:
         global currentTerm, log, commitIndex, nextIndex, agreedLogNumber
+
         sockClient = socket.socket()
         sockClient.connect((dest_host, dest_port))
         print "->send ! to" + dest_host, dest_port
@@ -147,6 +164,7 @@ def sendHeartbeat(dest_host, dest_port, clientID):
         else:
             term = -1
 
+        # Create payload data
         payloads = ('beat' + '{ '
                     '"term" : ' + str(currentTerm) + ","
                     '"leaderID" : ' + str(myID) + ","
@@ -162,6 +180,7 @@ def sendHeartbeat(dest_host, dest_port, clientID):
         print recvData
         body = json.loads(recvData)
 
+        # Check result, add agreed commit and manage nextIndex
         if(body['success'] == 'True'):
             nextIndex[clientID] += 1
             agreedLogNumber += 1
@@ -179,9 +198,11 @@ def sendHeartbeat(dest_host, dest_port, clientID):
 def broadcastHeartbeat(myhost, myport):
     global agreedLogNumber, commitIndex
     """Used by leader to broadcast heartbeat every HEARTBEAT_SEND_S."""
+
     while (state == "LEADER"):
         print "I'm a leader"
         jobs = []
+
         for follower in LOAD_BALANCER:
             if (follower[0] != myhost and follower[1] != myport):
                 t = Thread(target=sendHeartbeat,
@@ -194,6 +215,8 @@ def broadcastHeartbeat(myhost, myport):
         for job in jobs:
             job.join()
         print "+++++++++agreed " + str(agreedLogNumber)
+
+        # Check majority vote, commit if success
         if (agreedLogNumber >= len(LOAD_BALANCER) / 2 + 1):
             print "==============commit index"
             commitIndex += 1
@@ -226,12 +249,15 @@ def listenHeartbeat(myhost, myport):
             (conn, (ip, port)) = sockServer.accept()
             conn.setblocking(1)
             text = conn.recv(2048)
+
             # print "<-recv " + text + "from" + ip, port
             # global currentTerm
             if (text[0:4] == "beat"):
+                # Manage heartbeat
                 result = processHearbeat(text[4:], myhost, myport)
                 conn.send(result)
             elif (text[0:3] == "req"):
+                # requestVote management
                 global votedFor
                 if (votedFor != -1):
                     print "->send no to" + ip, port
@@ -254,15 +280,20 @@ def askVote(myhost, myport):
     print "I'm a candidate"
     majorityVote = len(LOAD_BALANCER) / 2 + 1
     agreedVote = 1
+
     print myhost, myport
+
+    # Ask vote to all load balancer
     for follower in LOAD_BALANCER:
         print follower
         if (follower[0] != myhost and follower[1] != myport):
-            try:
+            try
                 sockClient = socket.socket()
                 sockClient.connect((follower[0], follower[1] + 1))
                 print "->requesting vote to" + follower[0], follower[1] + 1
                 sockClient.send("req|" + str(myID))
+
+                # Handle vote result
                 data = sockClient.recv(128)
                 print "<-recv " + data + " frm " + follower[0], follower[1] + 1
                 if (data == "yes"):
@@ -276,6 +307,8 @@ def askVote(myhost, myport):
             print "It's me"
     global state
     print "  recvd vote " + str(agreedVote)
+
+    # Check majority vote, become a leader if success
     if agreedVote >= majorityVote:
         state = "LEADER"
         global currentTerm
@@ -301,6 +334,7 @@ def workerListener(myhost, myport):
             text = conn.recv(128)
             text = text.split(";")
 
+            # Handle data from worker
             print "<-    recv from daemon " + text[0] + " " + text[1] + " from " + ip, port
             if (currentTerm > 0):
                 logElement = LogElement(currentTerm, text[0], (ip, text[1]))
@@ -408,8 +442,10 @@ if __name__ == '__main__':
         print("Invalid Argument to start the file\n")
     else:
         myID = int(sys.argv[1])
-        t = Thread(target=main, args=('', LOAD_BALANCER[myID][1]))
-        t.start()
-        print "@@@@@@@@@@@@@@@@@hello"
         server = HTTPServer(('', LOAD_BALANCER[myID][1]), LoadBalancerHandler)
-        server.serve_forever()
+        print "@@@@@@@@@@@@@@@@@hello"
+
+        t = Thread(target=server.serve_forever, args=())
+        t.start()
+        print "$$$$$$$$$$$$"
+        main('', LOAD_BALANCER[myID][1])
