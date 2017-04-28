@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+
+# Nama file : daemon.py
+# Anggota :
+#   1. Geraldi Dzakwan (13514065)
+#   2. Ade Yusuf Rahardian (13514079)
+#   3. Muhammad Reza Ramadhan (13514107)
+
+"""IMPLEMENTASI RAFT - DAEMON."""
 import socket
 import psutil
 import requests
@@ -12,7 +20,7 @@ loadBalancerList = []
 # Run with host name and port number argument
 # Example : python daemon.py 8080
 PORT_NUMBER = sys.argv[1]
-            
+
 def getWorkLoad():
     """ Get current workload """
     cpu_workload = str(psutil.cpu_percent(interval=0.1))
@@ -36,7 +44,7 @@ def sendWorkload(workload):
             if errorcode == socket.errno.ECONNREFUSED:
                 print "!!Connection Refused"
 
-                
+
 while True:
     workload = getWorkLoad()
     print(str(workload))

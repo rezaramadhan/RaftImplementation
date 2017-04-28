@@ -1,4 +1,11 @@
-"""Raft configuration."""
+# Nama file : config.py
+# Anggota :
+#   1. Geraldi Dzakwan (13514065)
+#   2. Ade Yusuf Rahardian (13514079)
+#   3. Muhammad Reza Ramadhan (13514107)
+
+"""IMPLEMENTASI RAFT - CONFIG."""
+
 LOAD_BALANCER = [
     ['127.0.0.1', 5000],
     ['127.0.0.1', 6000],
