@@ -32,18 +32,23 @@ matchIndex = []
 
 
 class logElement:
+    """Log element Class."""
+
     def __init__(self, term, load, owner):
+        """constructor."""
         self.term = term
         self.load = 80
         self.owner = owner
 
     def toString(self):
+        """Tostring method."""
         data = ('{ "term" : "' + str(self.term) +
                 '", "load" : "' + str(self.load) +
                 '", "owner" : "' + str(self.owner) + '" }')
         return data
 
     def __str__(self):
+        """Tostring method."""
         data = ('{ "term" : "' + str(self.term) +
                 '", "load" : "' + str(self.load) +
                 '", "owner" : "' + str(self.owner) + '" }')
