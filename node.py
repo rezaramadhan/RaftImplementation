@@ -8,19 +8,25 @@ from threading import Thread
 from config import *
 from time import sleep
 
-def appendEntries(term, leaderID, prefLogIdx, prefLogTerm, entries, leaderCommitIdx):
+def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries, leaderCommitIdx):
+    term = int(term)
+    leaderID = int(leaderID)
+    prevLogIdx = int(prevLogIdx)
+    prevLogTerm = int(prevLogTerm)
+    leaderCommitIdx = int(leaderCommitIdx)
+    
     if term < currentTerm:
         return (currentTerm, False)
     
-    if prevLogIndex < len(log)
-        entry = log[prevLogIndex]
+    if prevLogIdx < len(log)
+        entry = log[prevLogIdx]
         logTerm = entry["term"]
         
         if logTerm == prevLogTerm:
             log.append(entries)
             
-            if commitIndex < leaderCommit:
-                commitIndex = leaderCommit
+            if commitIndex < leaderCommitIdx:
+                commitIndex = leaderCommitIdx
                 
             return (currentTerm, True)
     
