@@ -30,3 +30,9 @@ lastApplied = -1
 """ Volatile state on leaders """
 nextIndex = []
 matchIndex = []
+
+class logElement():
+    def __init__(term, load, owner):
+        self.term = term
+        self.load = 80
+        self.owner = owner
