@@ -19,10 +19,12 @@ def getLoadBalancerList(filename):
         for line in fp:
             loadBalancerList.append(line)
 
-#Tentative, nanti ini dicari lagi
+
+# Tentative, nanti ini dicari lagi
 def getWorkLoad():
     cpu_workload = str(psutil.cpu_percent(interval=0.1))
     return cpu_workload
+
 
 def sendWorkload(workload):
     for url in LOAD_BALANCER:
@@ -40,9 +42,10 @@ def sendWorkload(workload):
             if errorcode == socket.errno.ECONNREFUSED:
                 print "!!Connection Refused"
 
+
 print "haha"
 while True:
     workload = getWorkLoad()
     print(str(workload))
     sendWorkload(workload)
-    sleep(5)
+    sleep(15)

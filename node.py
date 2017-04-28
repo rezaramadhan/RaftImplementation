@@ -5,8 +5,12 @@ import json
 import socket
 import sys
 import random
+import json
+import os.path
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+import requests
 from threading import Thread
-from config import (LOAD_BALANCER, state, HEARTBEAT_SEND_S,
+from config import (LOAD_BALANCER, state, HEARTBEAT_SEND_S, server_list,
                     HEARTBEAT_TIMEOUT_BASE_S, WORKER_TIMEOUT,
                     currentTerm, votedFor, log, commitIndex, lastApplied,
                     nextIndex, matchIndex, LogElement)
@@ -15,11 +19,45 @@ from time import sleep
 myID = 0
 agreedLogNumber = 1
 
+
+class LoadBalancerHandler(BaseHTTPRequestHandler):
+    def __init__(self, request, client_address, server):
+        # Don't change init order. If changed, exception is gonna happen
+        BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+
+    def do_POST(self):
+        try:
+            print(self.request.get('cpu_workload'))
+        except Exception as ex:
+            self.send_response(500)
+            self.end_headers()
+            print(ex)
+
+    def do_GET(self):
+        try:
+            args = self.path.split('/')
+            if len(args) != 2:
+                raise Exception()
+            n = int(args[1])
+
+            suitableWorker = getLowestDaemon()
+            r = requests.get("http://"+str(suitableWorker[0])+":"+str(suitableWorker[1])+"/"+str(n))
+            data = r.text
+            self.send_response(200)
+            self.end_headers()
+
+            self.wfile.write(data.encode('utf-8'))
+
+        except Exception as ex:
+            self.send_response(500)
+            self.end_headers()
+            print(ex)
+
+
 def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
-                  leaderCommitIdx):
+                  leaderCommitIdx, myhost, myport):
     """Append entries RPC."""
     global currentTerm, votedFor, commitIndex, log
-
 
     if (term > currentTerm):
         currentTerm = term
@@ -44,12 +82,16 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
 
     # if logTerm == prevLogTerm:
     new_entry = []
+    global server_list
     for entry in entries:
         elmt = LogElement()
         elmt.setDict(entry)
         new_entry.append(elmt)
+        server_list[elmt.owner] = elmt.load
 
     log = log[:(prevLogIdx+1)] + new_entry
+    saveLog("log"+myhost+str(myport)+".txt")
+
     print
     print "__log__" + str(log)
     print
@@ -60,8 +102,7 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
     return (currentTerm, True)
 
 
-
-def processHearbeat(data):
+def processHearbeat(data, myhost, myport):
     """Used by follower to prcess a heartbeat payload."""
     # print "  processing data " + data
     body = json.loads(data)
@@ -72,7 +113,7 @@ def processHearbeat(data):
 
     (term, result) = appendEntries(body['term'], body['leaderID'],
                                    body['prefLogIdx'], body['prefLogTerm'],
-                                   body['entries'], body['leaderCommitIdx'])
+                                   body['entries'], body['leaderCommitIdx'], myhost, myport)
     data = '{"term" : ' + str(term) + ', "success" : "' + str(result) + '"}'
     return data
 
@@ -188,7 +229,7 @@ def listenHeartbeat(myhost, myport):
             # print "<-recv " + text + "from" + ip, port
             # global currentTerm
             if (text[0:4] == "beat"):
-                result = processHearbeat(text[4:])
+                result = processHearbeat(text[4:], myhost, myport)
                 conn.send(result)
             elif (text[0:3] == "req"):
                 global votedFor
@@ -246,6 +287,7 @@ def askVote(myhost, myport):
 
 def workerListener(myhost, myport):
     """Listener for a worker cpu loads."""
+    global server_list
     sockServer = socket.socket()
     sockServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sockServer.bind((myhost, myport - 1))
@@ -258,13 +300,16 @@ def workerListener(myhost, myport):
             conn.setblocking(1)
             text = conn.recv(128)
             text = text.split(";")
+
             print "<-    recv from daemon " + text[0] + " " + text[1] + " from " + ip, port
             if (currentTerm > 0):
                 logElement = LogElement(currentTerm, text[0], (ip, text[1]))
                 log.append(logElement)
+                saveLog("log" + myhost+str(myport)+".txt")
+                server_list[(ip, text[1])] = text[0]
             # print log
-            # printlog()
             conn.close()
+
         except socket.timeout:
             print "leader is dead"
 
@@ -284,12 +329,69 @@ def initializeNextIndex():
         nextIndex.append(len(log))
 
 
+def getLowestDaemon():
+    lowestDaemon = None
+    lowestValue = 9999
+
+    for key in server_list:
+        if (lowestDaemon is None):
+            lowestDaemon = key
+            lowestValue = server_list[key]
+        elif(server_list[key] < lowestValue):
+            lowestDaemon = key
+            lowestValue = server_list[key]
+
+    return lowestDaemon
+
+
+def loadLog(filename):
+    # Check whether the file exist or not
+    if(os.path.isfile(filename)):
+        file = open(filename, "r")
+
+        text = file.read()
+        text = text.split("|")
+
+        # Check whether the file empty or not
+        if(len(text) != 0):
+            currentTerm = int(text[0])
+            if(text[0] != "None"):
+                votedFor = text[0]
+            logTemp = json.loads(text[2])
+
+            for data in logTemp:
+                logElement = LogElement(data['term'], data['load'], data['owner'])
+                log.append(logElement)
+
+            for data in log:
+                server_list[str(data.owner)] = str(data.load)
+
+            # print server_list
+
+
+def saveLog(filename):
+    file = open(filename, "w")
+
+    file.write(str(currentTerm))
+    file.write("|")
+    file.write(str(votedFor))
+    file.write("|")
+    file.write(str(log))
+    file.close()
+
+
 def main(myhost, myport):
     """Main program entry point."""
     print "I'm " + myhost, myport
+
+    # Load existing log
+    loadLog('log'+myhost+str(myport)+'.txt')
+
+    # Start thread to listen from daemon
     t = Thread(target=workerListener,
                args=(myhost, myport))
     t.start()
+
     while True:
         if (state == "FOLLOWER"):
             listenHeartbeat(myhost, myport)
@@ -306,4 +408,8 @@ if __name__ == '__main__':
         print("Invalid Argument to start the file\n")
     else:
         myID = int(sys.argv[1])
-        main('', LOAD_BALANCER[myID][1])
+        t = Thread(target=main, args=('', LOAD_BALANCER[myID][1]))
+        t.start()
+        print "@@@@@@@@@@@@@@@@@hello"
+        server = HTTPServer(('', LOAD_BALANCER[myID][1]), LoadBalancerHandler)
+        server.serve_forever()
