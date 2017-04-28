@@ -39,5 +39,5 @@ HOST_NAME = sys.argv[1]
 PORT_NUMBER = int(sys.argv[2])
 
 if __name__ == '__main__':
-    server = HTTPServer((HOST_NAME, PORT_NUMBER), WorkerHandler)
+    server = HTTPServer(("", PORT_NUMBER), WorkerHandler)
     server.serve_forever();
