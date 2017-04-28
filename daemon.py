@@ -45,4 +45,4 @@ while True:
     workload = getWorkLoad()
     print(str(workload))
     sendWorkload(workload)
-    sleep(5)
+    sleep(15)
