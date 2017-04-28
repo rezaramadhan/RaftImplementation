@@ -19,9 +19,10 @@ def appendEntries(term, leaderID, prefLogIdx, prefLogTerm, entries, leaderCommit
 def processHearbeat(data):
     print "  processing data " + data
     body = json.loads(data)
-    entries
-    appendEntries(body['term'], body['leaderID'], body['prefLogIdx'],
-                  body['prefLogTerm'], body['entries'], body['leaderCommitIdx'])
+    (term, result) = appendEntries(body['term'], body['leaderID'],
+                                   body['prefLogIdx'], body['prefLogTerm'],
+                                   body['entries'], body['leaderCommitIdx'])
+    return result
 
 def createEntries(firstIdx, lastIdx):
     data = "[" + log[i]
@@ -110,14 +111,14 @@ def listenHeartbeat(myhost, myport):
             global term
             if (text[0:4] == "beat"):
                 processHearbeat(text[4:])
-            elif (text == "request_vote"):
-                if (isAlreadyVote):
+            elif (text[0:3] == "req"):
+                if (votedFor == -1):
                     print "->send no to" + ip, port
                     conn.send("no")
                 else:
                     print "->send yes to" + ip, port
                     conn.send("yes")
-                    isAlreadyVote = True
+                    votedFor = int(text.split('|')[1])
             conn.close()
         except socket.timeout:
             print "leader is dead"
@@ -138,7 +139,7 @@ def askVote(myhost, myport):
                 sockClient = socket.socket()
                 sockClient.connect((follower[0], follower[1] + 1))
                 print "->requesting vote to" + follower[0], follower[1] + 1
-                sockClient.send("request_vote")
+                sockClient.send("req|" + myID)
                 data = sockClient.recv(128)
                 print "<-recv " + data + " frm " + follower[0], follower[1] + 1
                 if (data == "yes"):

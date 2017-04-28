@@ -20,7 +20,7 @@ server_list = {}
 
 """ Persistent state on all servers """
 currentTerm = 0
-votedFor = null
+votedFor = -1
 log = []
 
 """ Volatile state on all servers """
@@ -39,6 +39,12 @@ class logElement():
         self.owner = owner
 
     def toString()
+        data = '{ "term" : "' + str(self.term)+
+        '", "load" : "' + str(self.load) +
+        '", "owner" : "' + str(self.owner) + '" }'
+        return data
+
+    def __str__()
         data = '{ "term" : "' + str(self.term)+
         '", "load" : "' + str(self.load) +
         '", "owner" : "' + str(self.owner) + '" }'
