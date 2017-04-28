@@ -18,7 +18,7 @@ WORKER_TIMEOUT = 5
 server_list = {}
 
 
-""" Persistent state on all servers """"
+""" Persistent state on all servers """
 currentTerm = 0
 votedFor = null
 log = []
@@ -31,11 +31,15 @@ lastApplied = -1
 nextIndex = []
 matchIndex = []
 
+
 class logElement():
     def __init__(term, load, owner):
         self.term = term
         self.load = 80
         self.owner = owner
-        
+
     def toString()
-        return '{ "term" : "' + str(self.term)+ '", "load" : "' + str(self.load) + '", "owner" : "' + str(self.owner) + '" }'
+        data = '{ "term" : "' + str(self.term)+
+        '", "load" : "' + str(self.load) +
+        '", "owner" : "' + str(self.owner) + '" }'
+        return data

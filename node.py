@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """high level support for doing this and that."""
 
+import json
 import socket
 import sys
 import random
@@ -8,17 +9,55 @@ from threading import Thread
 from config import *
 from time import sleep
 
+myID = 0
+
 def appendEntries(term, leaderID, prefLogIdx, prefLogTerm, entries, leaderCommitIdx):
     # term, succes
 
 
-def sendHeartbeat(dest_host, dest_port):
+
+def processHearbeat(data):
+    print "  processing data " + data
+    body = json.loads(data)
+    entries
+    appendEntries(body['term'], body['leaderID'], body['prefLogIdx'],
+                  body['prefLogTerm'], body['entries'], body['leaderCommitIdx'])
+
+def createEntries(firstIdx, lastIdx):
+    data = "[" + log[i]
+    for i in range(firstIdx + 1, lastIdx)
+        data = data + ", " + log[i]
+    data = data + "]"
+    return data
+
+
+def sendHeartbeat(dest_host, dest_port, clientID):
     """Sending heartbeat to a single follower using a certain socket Client."""
     try:
         sockClient = socket.socket()
         sockClient.connect((dest_host, dest_port))
         print "->send ! to" + dest_host, dest_port
-        sockClient.send("!" + str(term))
+        prefLogIdx = nextIndex[clientID] - 1
+        entries = createEntries(prefLogIdx + 1, len(log))
+
+        payloads = 'beat' + '{ ' +
+        '"term" : ' + term + "," +
+        '"leaderID" : ' + myID + "," +
+        '"prefLogIdx" : ' + prefLogIdx + "," +
+        '"prefLogTerm" : ' + log[prefLogIdx].term + "," +
+        '"entries" : ' + entries + "," +
+        '"leaderCommitIdx" : ' + commitIndex + "," +
+        '}'
+
+        sockClient.send(payloads)
+        recvData = sockClient.recv(1024)
+        body = json.loads(recvData)
+
+        if(body['succes'] == "True"):
+            nextIndex[clientID] += 1
+        elif (body['success'] == "False"):
+            nextIndex[clientID] -= 1
+
         sockClient.close()
     except socket.error, v:
         errorcode = v[0]
@@ -69,11 +108,8 @@ def listenHeartbeat(myhost, myport):
             text = conn.recv(128)
             print "<-recv " + text + "from" + ip, port
             global term
-            if (text[0] == "!"):
-                print "!-leader is alive"
-                if (term != int(text.split('!')[1])):
-                    term = int(text.split('!')[1])
-                    isAlreadyVote = False
+            if (text[0:4] == "beat"):
+                processHearbeat(text[4:])
             elif (text == "request_vote"):
                 if (isAlreadyVote):
                     print "->send no to" + ip, port
@@ -88,7 +124,6 @@ def listenHeartbeat(myhost, myport):
             state = "CANDIDATE"
 #    sockServer.shutdown(socket.SHUT_RDWR)
     print "   now I'm not a follower"
-
 
 def askVote(myhost, myport):
     """Used by candidate to ask vote as a leader."""
@@ -145,18 +180,19 @@ def workerListener():
 def main(myhost, myport):
     """Main program entry point."""
     print "I'm " + myhost, myport
-    while True:
-        if (state == "FOLLOWER"):
-            listenHeartbeat(myhost, myport)
-        elif (state == "CANDIDATE"):
-            askVote(myhost, myport)
-        elif (state == "LEADER"):
-            broadcastHeartbeat(myhost, myport)
-        print
+    # while True:
+    #     if (state == "FOLLOWER"):
+    #         listenHeartbeat(myhost, myport)
+    #     elif (state == "CANDIDATE"):
+    #         askVote(myhost, myport)
+    #     elif (state == "LEADER"):
+    #         broadcastHeartbeat(myhost, myport)
+    #     print
 
 
 if __name__ == '__main__':
     if (len(sys.argv) != 2):
         print("Invalid Argument to start the file\n")
     else:
-        main('', int(sys.argv[1]))
+        myID = int(sys.argv[1])
+        main('', LOAD_BALANCER[myID][1])
