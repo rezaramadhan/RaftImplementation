@@ -9,7 +9,6 @@ LOAD_BALANCER = [
 
 # Avaiable state = [FOLLOWER, LEADER, CANDIDATE]
 state = "FOLLOWER"
-term = 1
 # HEARTBEAT_SEND_S = 0.05
 # HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S
 HEARTBEAT_SEND_S = 2
@@ -24,7 +23,7 @@ votedFor = -1
 log = []
 
 """ Volatile state on all servers """
-commitIndex = -1
+commitIndex = 0
 lastApplied = -1
 
 """ Volatile state on leaders """
@@ -32,20 +31,20 @@ nextIndex = []
 matchIndex = []
 
 
-class logElement():
-    def __init__(term, load, owner):
+class logElement:
+    def __init__(self, term, load, owner):
         self.term = term
         self.load = 80
         self.owner = owner
 
-    def toString():
-        data = '{ "term" : "' + str(self.term)+
-        '", "load" : "' + str(self.load) +
-        '", "owner" : "' + str(self.owner) + '" }'
+    def toString(self):
+        data = ('{ "term" : "' + str(self.term) +
+                '", "load" : "' + str(self.load) +
+                '", "owner" : "' + str(self.owner) + '" }')
         return data
 
-    def __str__():
-        data = '{ "term" : "' + str(self.term)+
-        '", "load" : "' + str(self.load) +
-        '", "owner" : "' + str(self.owner) + '" }'
+    def __str__(self):
+        data = ('{ "term" : "' + str(self.term) +
+                '", "load" : "' + str(self.load) +
+                '", "owner" : "' + str(self.owner) + '" }')
         return data

@@ -6,14 +6,20 @@ import socket
 import sys
 import random
 from threading import Thread
-from config import *
+from config import (LOAD_BALANCER, state, HEARTBEAT_SEND_S,
+                    HEARTBEAT_TIMEOUT_BASE_S, WORKER_TIMEOUT,
+                    currentTerm, votedFor, log, commitIndex, lastApplied,
+                    nextIndex, matchIndex, logElement)
 from time import sleep
 
 myID = 0
 
-def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries, leaderCommitIdx):
+
+def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
+                  leaderCommitIdx):
     term = int(term)
     leaderID = int(leaderID)
+
     prevLogIdx = int(prevLogIdx)
     prevLogTerm = int(prevLogTerm)
     leaderCommitIdx = int(leaderCommitIdx)
@@ -27,7 +33,7 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries, leaderCommit
 
         if logTerm == prevLogTerm:
             log.append(entries)
-
+            global commitIndex
             if commitIndex < leaderCommitIdx:
                 commitIndex = leaderCommitIdx
 
@@ -36,18 +42,19 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries, leaderCommit
     return (currentTerm, False)
 
 
-
 def processHearbeat(data):
     print "  processing data " + data
     body = json.loads(data)
     (term, result) = appendEntries(body['term'], body['leaderID'],
                                    body['prefLogIdx'], body['prefLogTerm'],
                                    body['entries'], body['leaderCommitIdx'])
-    return result
+    data = '{"term" : ' + term + ', "success" : ' + str(result) + '}'
+    return data
+
 
 def createEntries(firstIdx, lastIdx):
-    data = "[" + log[i]
-    for i in range(firstIdx + 1, lastIdx)
+    data = "[" + log[firstIdx]
+    for i in range(firstIdx + 1, lastIdx):
         data = data + ", " + log[i]
     data = data + "]"
     return data
@@ -56,21 +63,23 @@ def createEntries(firstIdx, lastIdx):
 def sendHeartbeat(dest_host, dest_port, clientID):
     """Sending heartbeat to a single follower using a certain socket Client."""
     try:
+        global term, log, commitIndex, nextIndex
         sockClient = socket.socket()
         sockClient.connect((dest_host, dest_port))
         print "->send ! to" + dest_host, dest_port
         prefLogIdx = nextIndex[clientID] - 1
         entries = createEntries(prefLogIdx + 1, len(log))
 
-        payloads = 'beat' + '{ ' +
-        '"term" : ' + term + "," +
-        '"leaderID" : ' + myID + "," +
-        '"prefLogIdx" : ' + prefLogIdx + "," +
-        '"prefLogTerm" : ' + log[prefLogIdx].term + "," +
-        '"entries" : ' + entries + "," +
-        '"leaderCommitIdx" : ' + commitIndex + "," +
-        '}'
+        payloads = ('beat' + '{ '
+                    '"term" : ' + term + ","
+                    '"leaderID" : ' + myID + ","
+                    '"prefLogIdx" : ' + prefLogIdx + ","
+                    '"prefLogTerm" : ' + log[prefLogIdx].term + ","
+                    '"entries" : ' + entries + ","
+                    '"leaderCommitIdx" : ' + commitIndex + ","
+                    '}')
 
+        print payloads
         sockClient.send(payloads)
         recvData = sockClient.recv(1024)
         body = json.loads(recvData)
@@ -95,7 +104,8 @@ def broadcastHeartbeat(myhost, myport):
         for follower in LOAD_BALANCER:
             if (follower[0] != myhost and follower[1] != myport):
                 t = Thread(target=sendHeartbeat,
-                           args=(follower[0], follower[1] + 1))
+                           args=(follower[0], follower[1] + 1,
+                                 LOAD_BALANCER.index(follower)))
                 jobs.append(t)
                 t.start()
 
@@ -114,7 +124,6 @@ def listenHeartbeat(myhost, myport):
     print "I'm a folllower"
     print "  Creating heartbeat listener on " + myhost, myport + 1
 
-    isAlreadyVote = False
     global state
     while (state == "FOLLOWER"):
         # print "I'm a folllower"
@@ -131,8 +140,10 @@ def listenHeartbeat(myhost, myport):
             print "<-recv " + text + "from" + ip, port
             global term
             if (text[0:4] == "beat"):
-                processHearbeat(text[4:])
+                result = processHearbeat(text[4:])
+                conn.send(result)
             elif (text[0:3] == "req"):
+                global votedFor
                 if (votedFor == -1):
                     print "->send no to" + ip, port
                     conn.send("no")
@@ -146,6 +157,7 @@ def listenHeartbeat(myhost, myport):
             state = "CANDIDATE"
 #    sockServer.shutdown(socket.SHUT_RDWR)
     print "   now I'm not a follower"
+
 
 def askVote(myhost, myport):
     """Used by candidate to ask vote as a leader."""
@@ -183,7 +195,7 @@ def askVote(myhost, myport):
     print "   now I'm not a candidate"
 
 
-def workerListener():
+def workerListener(myhost, myport):
     sockServer = socket.socket()
     sockServer.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sockServer.bind((myhost, myport + 1))
@@ -199,17 +211,23 @@ def workerListener():
             print "leader is dead"
 
 
+def initializeNextIndex():
+    for i in range(0, len(LOAD_BALANCER)):
+        nextIndex[i] = len(log)
+
+
 def main(myhost, myport):
     """Main program entry point."""
     print "I'm " + myhost, myport
-    # while True:
-    #     if (state == "FOLLOWER"):
-    #         listenHeartbeat(myhost, myport)
-    #     elif (state == "CANDIDATE"):
-    #         askVote(myhost, myport)
-    #     elif (state == "LEADER"):
-    #         broadcastHeartbeat(myhost, myport)
-    #     print
+    while True:
+        if (state == "FOLLOWER"):
+            listenHeartbeat(myhost, myport)
+        elif (state == "CANDIDATE"):
+            askVote(myhost, myport)
+        elif (state == "LEADER"):
+            initializeNextIndex()
+            broadcastHeartbeat(myhost, myport)
+        print
 
 
 if __name__ == '__main__':
