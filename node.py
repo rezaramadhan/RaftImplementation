@@ -5,19 +5,8 @@ import socket
 import sys
 import random
 from threading import Thread
-from config import LOAD_BALANCER
+from config import *
 from time import sleep
-
-# Avaiable state = [FOLLOWER, LEADER, CANDIDATE]
-state = "FOLLOWER"
-term = 1
-# HEARTBEAT_SEND_S = 0.05
-# HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S
-HEARTBEAT_SEND_S = 2
-HEARTBEAT_TIMEOUT_BASE_S = HEARTBEAT_SEND_S * 2
-WORKER_TIMEOUT = 5
-server_list = {}
-
 
 def appendEntries(term, leaderID, prefLogIdx, prefLogTerm, entries, leaderCommitIdx):
     # term, succes
