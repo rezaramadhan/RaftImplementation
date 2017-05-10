@@ -52,7 +52,6 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
             # print "n" + args[1]
             if (args[1] == "favicon.ico"):
                 return
-                
             n = int(args[1])
 
             server_dead = True
@@ -95,6 +94,15 @@ class LoadBalancerHandler(BaseHTTPRequestHandler):
             print(ex)
 
 
+def updateLeaderCommit(myhost, myport):
+    smallest = nextIndex[0]
+    for i in range(1, len(nextIndex)):
+        if (LOAD_BALANCER[i][0] != myhost and LOAD_BALANCER[i][1] != myport):
+            if (nextIndex[i] < smallest):
+                smallest = nextIndex[i]
+
+    return smallest
+
 def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
                   leaderCommitIdx, myhost, myport):
     """Append entries RPC."""
@@ -103,6 +111,8 @@ def appendEntries(term, leaderID, prevLogIdx, prevLogTerm, entries,
     if (term > currentTerm):
         currentTerm = term
         votedFor = -1
+        if (state == "LEADER"):
+            state = "FOLLOWER"
 
 
     # Check if there's no entry in payload
@@ -251,11 +261,7 @@ def broadcastHeartbeat(myhost, myport):
         print "+++++++++agreed " + str(agreedLogNumber)
 
         # Check majority vote, commit if success
-        if (agreedLogNumber >= len(LOAD_BALANCER) / 2 + 1):
-            print "==============commit index"
-            commitIndex += 1
-        else:
-            print "============notcommit"
+        updateLeaderCommit(myhost, myport)
 
         agreedLogNumber = 1
         sleep(HEARTBEAT_SEND_S)
@@ -271,7 +277,7 @@ def listenHeartbeat(myhost, myport):
     print "  Creating heartbeat listener on " + myhost, myport + 1
 
     global state
-    while (state == "FOLLOWER"):
+    while (True):
         # print "I'm a folllower"
         try:
             # random timeout between X and 2X
@@ -461,10 +467,13 @@ def main(myhost, myport):
     t = Thread(target=workerListener,
                args=(myhost, myport))
     t.start()
+    t2 = Thread(target=listenHeartbeat, args=(myhost, myport))
+    t2.start()
 
     while True:
         if (state == "FOLLOWER"):
-            listenHeartbeat(myhost, myport)
+            # listenHeartbeat(myhost, myport)
+            pass
         elif (state == "CANDIDATE"):
             askVote(myhost, myport)
         elif (state == "LEADER"):
